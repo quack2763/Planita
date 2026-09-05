@@ -18,6 +18,9 @@ ASSET_DIR = Path(__file__).parent / "assets"
 PLAYER_SIZE = (72, 60)
 ENEMY_SIZE = (70, 55)
 
+# BIG slow enemy
+SLOW_ENEMY_SIZE = (115, 90)
+
 GROUND_TILE_SIZE = (205, 70)
 PLATFORM_TILE_SIZE = (205, 48)
 
@@ -28,6 +31,31 @@ SPIKE_SIZE = (90, 68)
 FLAG_SIZE = (250, 350)
 
 WHITE = (255, 255, 255)
+
+
+# ============================================================
+# MUSIC
+# ============================================================
+
+try:
+    pygame.mixer.init()
+
+    music_file = None
+
+    for extension in (".mp3", ".wav", ".ogg"):
+        possible_file = ASSET_DIR / ("gameMusic" + extension)
+
+        if possible_file.exists():
+            music_file = possible_file
+            break
+
+    if music_file is not None:
+        pygame.mixer.music.load(str(music_file))
+        pygame.mixer.music.set_volume(0.2)
+        pygame.mixer.music.play(-1)
+
+except pygame.error:
+    pass
 
 
 # ============================================================
@@ -73,6 +101,12 @@ player_image = load_image(
 enemy_image = load_image(
     "enemy.png",
     ENEMY_SIZE
+)
+
+# YOUR BIG SLOW ENEMY IMAGE
+slow_enemy_image = load_image(
+    "slow_enemie.png",
+    SLOW_ENEMY_SIZE
 )
 
 jump_pad_image = load_image(
@@ -1008,7 +1042,7 @@ class Player:
 
 
 # ============================================================
-# ENEMY
+# NORMAL ENEMY
 # ============================================================
 
 class Enemy:
@@ -1168,45 +1202,358 @@ class Enemy:
 
 
 # ============================================================
+# BIG SLOW ENEMY
+# ============================================================
+
+class SlowEnemy:
+
+    def __init__(
+        self,
+        x,
+        y,
+        left_bound,
+        right_bound
+    ):
+
+        self.x = float(x)
+        self.y = float(y)
+
+        self.w, self.h = SLOW_ENEMY_SIZE
+
+        # VERY SLOW
+        self.speed = 0.65
+
+        self.direction = 1
+
+        self.start_x = float(x)
+        self.start_y = float(y)
+
+        self.left_bound = float(
+            left_bound
+        )
+
+        self.right_bound = float(
+            right_bound
+        )
+
+        self.walk_timer = 0
+
+        self.rotation = 0
+
+        self.alive = True
+
+        self.squash_timer = 0
+
+        # Needs THREE stomps
+        self.hits_remaining = 3
+
+        # Prevents instant repeated stomps
+        self.hit_cooldown = 0
+
+    @property
+    def rect(self):
+
+        return pygame.Rect(
+            round(self.x),
+            round(self.y),
+            self.w,
+            self.h
+        )
+
+    def update(self):
+
+        if self.hit_cooldown > 0:
+
+            self.hit_cooldown -= 1
+
+        if not self.alive:
+
+            if self.squash_timer > 0:
+
+                self.squash_timer -= 1
+
+            return
+
+        # Slow movement
+        self.x += (
+            self.speed *
+            self.direction
+        )
+
+        if self.x <= self.left_bound:
+
+            self.x = self.left_bound
+
+            self.direction = 1
+
+        elif self.x >= self.right_bound:
+
+            self.x = self.right_bound
+
+            self.direction = -1
+
+        self.walk_timer += 1
+
+        # Chunky slow wobble
+        self.rotation = (
+            self.direction *
+            3 *
+            pygame.math.Vector2(
+                1,
+                0
+            ).rotate(
+                self.walk_timer * 8
+            ).x
+        )
+
+    def stomp(self):
+
+        if not self.alive:
+            return False
+
+        if self.hit_cooldown > 0:
+            return False
+
+        self.hits_remaining -= 1
+
+        self.hit_cooldown = 12
+
+        if self.hits_remaining <= 0:
+
+            self.alive = False
+            self.squash_timer = 18
+
+            return True
+
+        return False
+
+    def draw(
+        self,
+        surface,
+        camera_x
+    ):
+
+        if not self.alive:
+
+            if self.squash_timer <= 0:
+
+                return
+
+            squashed = (
+                pygame.transform.smoothscale(
+                    slow_enemy_image,
+                    (
+                        self.w + 20,
+                        28
+                    )
+                )
+            )
+
+            rect = squashed.get_rect(
+                midbottom=(
+                    self.x +
+                    self.w / 2 -
+                    camera_x,
+                    self.y +
+                    self.h
+                )
+            )
+
+            surface.blit(
+                squashed,
+                rect
+            )
+
+            return
+
+        rotated = pygame.transform.rotate(
+            slow_enemy_image,
+            self.rotation
+        )
+
+        center = (
+            self.x +
+            self.w / 2 -
+            camera_x,
+            self.y +
+            self.h / 2
+        )
+
+        surface.blit(
+            rotated,
+            rotated.get_rect(
+                center=center
+            )
+        )
+
+
+# ============================================================
 # LEVEL 1
 # ============================================================
 
 level1_platforms = [
 
-    pygame.Rect(-100, 535, 1300, 70),
-    pygame.Rect(1080, 535, 700, 70),
-    pygame.Rect(1400, 535, 850, 70),
-    pygame.Rect(2790, 535, 900, 70),
+    pygame.Rect(
+        -100,
+        535,
+        1300,
+        70
+    ),
 
-    pygame.Rect(650, 430, 195, 48),
-    pygame.Rect(1280, 390, 195, 48),
-    pygame.Rect(1620, 470, 195, 48),
-    pygame.Rect(2200, 420, 195, 48),
-    pygame.Rect(2500, 335, 195, 48),
-    pygame.Rect(3100, 430, 195, 48)
+    pygame.Rect(
+        1080,
+        535,
+        700,
+        70
+    ),
+
+    pygame.Rect(
+        1400,
+        535,
+        850,
+        70
+    ),
+
+    pygame.Rect(
+        2790,
+        535,
+        900,
+        70
+    ),
+
+    pygame.Rect(
+        650,
+        430,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        1280,
+        390,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        1620,
+        470,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        2200,
+        420,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        2500,
+        335,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        3100,
+        430,
+        195,
+        48
+    )
 ]
 
 
 level1_collision_platforms = [
 
-    pygame.Rect(-100, 540, 1300, 68),
-    pygame.Rect(1080, 540, 700, 68),
-    pygame.Rect(1400, 540, 850, 68),
-    pygame.Rect(2790, 540, 900, 68),
+    pygame.Rect(
+        -100,
+        540,
+        1300,
+        68
+    ),
 
-    pygame.Rect(657, 450, 181, 26),
-    pygame.Rect(1287, 410, 181, 28),
-    pygame.Rect(1627, 490, 181, 28),
-    pygame.Rect(2207, 440, 181, 28),
-    pygame.Rect(2507, 355, 181, 28),
-    pygame.Rect(3107, 450, 181, 26)
+    pygame.Rect(
+        1080,
+        540,
+        700,
+        68
+    ),
+
+    pygame.Rect(
+        1400,
+        540,
+        850,
+        68
+    ),
+
+    pygame.Rect(
+        2790,
+        540,
+        900,
+        68
+    ),
+
+    pygame.Rect(
+        657,
+        450,
+        181,
+        26
+    ),
+
+    pygame.Rect(
+        1287,
+        410,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        1627,
+        490,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        2207,
+        440,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        2507,
+        355,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        3107,
+        450,
+        181,
+        26
+    )
 ]
 
 
 level1_jump_pads = [
 
-    pygame.Rect(920, 497, 125, 40),
-    pygame.Rect(1830, 497, 125, 40)
+    pygame.Rect(
+        920,
+        497,
+        125,
+        40
+    ),
+
+    pygame.Rect(
+        1830,
+        497,
+        125,
+        40
+    )
 ]
 
 
@@ -1232,16 +1579,99 @@ level1_moving_platforms = [
 
 level1_enemies = [
 
-    Enemy(420, 480, 220, 850),
-    Enemy(750, 393, 675, 760),
-    Enemy(1160, 480, 1100, 1300),
-    Enemy(1450, 480, 1300, 1650),
-    Enemy(1700, 435, 1640, 1745),
-    Enemy(2010, 480, 1900, 2200),
-    Enemy(2300, 383, 2230, 2330),
-    Enemy(2570, 300, 2530, 2600),
-    Enemy(2920, 480, 2850, 3500),
-    Enemy(3210, 395, 3130, 3200)
+    Enemy(
+        420,
+        480,
+        220,
+        850
+    ),
+
+    Enemy(
+        750,
+        393,
+        675,
+        760
+    ),
+
+    Enemy(
+        1160,
+        480,
+        1100,
+        1300
+    ),
+
+    Enemy(
+        1450,
+        480,
+        1300,
+        1650
+    ),
+
+    Enemy(
+        1700,
+        435,
+        1640,
+        1745
+    ),
+
+    Enemy(
+        2010,
+        480,
+        1900,
+        2200
+    ),
+
+    Enemy(
+        2300,
+        383,
+        2230,
+        2330
+    ),
+
+    Enemy(
+        2570,
+        300,
+        2530,
+        2600
+    ),
+
+    Enemy(
+        2920,
+        480,
+        2850,
+        3500
+    ),
+
+    Enemy(
+        3210,
+        395,
+        3130,
+        3200
+    )
+]
+
+
+# ============================================================
+# LEVEL 1 SLOW ENEMIES
+# ============================================================
+
+level1_slow_enemies = [
+
+    # Big slow enemy on ground
+    SlowEnemy(
+        700,
+        450,
+        500,
+        950
+    ),
+
+    # Big slow enemy later in the level
+    SlowEnemy(
+        3000,
+        450,
+        2850,
+        3500
+    )
 ]
 
 
@@ -1251,66 +1681,349 @@ level1_enemies = [
 
 level2_platforms = [
 
-    pygame.Rect(-100, 535, 900, 70),
-    pygame.Rect(1050, 535, 500, 70),
-    pygame.Rect(1650, 535, 350, 70),
-    pygame.Rect(2250, 535, 500, 70),
-    pygame.Rect(3000, 535, 550, 70),
-    pygame.Rect(3800, 535, 1100, 70),
+    pygame.Rect(
+        -100,
+        535,
+        900,
+        70
+    ),
 
-    pygame.Rect(500, 420, 195, 48),
-    pygame.Rect(780, 350, 195, 48),
-    pygame.Rect(930, 270, 195, 48),
-    pygame.Rect(1150, 390, 195, 48),
-    pygame.Rect(1400, 300, 195, 48),
-    pygame.Rect(1570, 410, 195, 48),
-    pygame.Rect(1850, 330, 195, 48),
-    pygame.Rect(2050, 240, 195, 48),
-    pygame.Rect(2350, 390, 195, 48),
-    pygame.Rect(2580, 300, 195, 48),
-    pygame.Rect(2800, 220, 195, 48),
-    pygame.Rect(3150, 380, 195, 48),
-    pygame.Rect(3400, 290, 195, 48),
-    pygame.Rect(3650, 390, 195, 48),
-    pygame.Rect(4000, 330, 195, 48),
-    pygame.Rect(4300, 250, 195, 48),
-    pygame.Rect(4550, 390, 195, 48)
+    pygame.Rect(
+        1050,
+        535,
+        500,
+        70
+    ),
+
+    pygame.Rect(
+        1650,
+        535,
+        350,
+        70
+    ),
+
+    pygame.Rect(
+        2250,
+        535,
+        500,
+        70
+    ),
+
+    pygame.Rect(
+        3000,
+        535,
+        550,
+        70
+    ),
+
+    pygame.Rect(
+        3800,
+        535,
+        1100,
+        70
+    ),
+
+    pygame.Rect(
+        500,
+        420,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        780,
+        350,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        930,
+        270,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        1150,
+        390,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        1400,
+        300,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        1570,
+        410,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        1850,
+        330,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        2050,
+        240,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        2350,
+        390,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        2580,
+        300,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        2800,
+        220,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        3150,
+        380,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        3400,
+        290,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        3650,
+        390,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        4000,
+        330,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        4300,
+        250,
+        195,
+        48
+    ),
+
+    pygame.Rect(
+        4550,
+        390,
+        195,
+        48
+    )
 ]
 
 
 level2_collision_platforms = [
 
-    pygame.Rect(-100, 540, 900, 68),
-    pygame.Rect(1050, 540, 500, 68),
-    pygame.Rect(1650, 540, 350, 68),
-    pygame.Rect(2250, 540, 500, 68),
-    pygame.Rect(3000, 540, 550, 68),
-    pygame.Rect(3800, 540, 1100, 68),
+    pygame.Rect(
+        -100,
+        540,
+        900,
+        68
+    ),
 
-    pygame.Rect(507, 440, 181, 28),
-    pygame.Rect(787, 370, 181, 28),
-    pygame.Rect(937, 290, 181, 28),
-    pygame.Rect(1157, 410, 181, 28),
-    pygame.Rect(1407, 320, 181, 28),
-    pygame.Rect(1577, 430, 181, 28),
-    pygame.Rect(1857, 350, 181, 28),
-    pygame.Rect(2057, 260, 181, 28),
-    pygame.Rect(2357, 410, 181, 28),
-    pygame.Rect(2587, 320, 181, 28),
-    pygame.Rect(2807, 240, 181, 28),
-    pygame.Rect(3157, 400, 181, 28),
-    pygame.Rect(3407, 310, 181, 28),
-    pygame.Rect(3657, 410, 181, 28),
-    pygame.Rect(4007, 350, 181, 28),
-    pygame.Rect(4307, 270, 181, 28),
-    pygame.Rect(4557, 410, 181, 28)
+    pygame.Rect(
+        1050,
+        540,
+        500,
+        68
+    ),
+
+    pygame.Rect(
+        1650,
+        540,
+        350,
+        68
+    ),
+
+    pygame.Rect(
+        2250,
+        540,
+        500,
+        68
+    ),
+
+    pygame.Rect(
+        3000,
+        540,
+        550,
+        68
+    ),
+
+    pygame.Rect(
+        3800,
+        540,
+        1100,
+        68
+    ),
+
+    pygame.Rect(
+        507,
+        440,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        787,
+        370,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        937,
+        290,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        1157,
+        410,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        1407,
+        320,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        1577,
+        430,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        1857,
+        350,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        2057,
+        260,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        2357,
+        410,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        2587,
+        320,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        2807,
+        240,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        3157,
+        400,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        3407,
+        310,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        3657,
+        410,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        4007,
+        350,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        4307,
+        270,
+        181,
+        28
+    ),
+
+    pygame.Rect(
+        4557,
+        410,
+        181,
+        28
+    )
 ]
 
 
 level2_jump_pads = [
 
-    pygame.Rect(680, 495, 125, 40),
-    pygame.Rect(820, 310, 125, 40)
+    pygame.Rect(
+        680,
+        495,
+        125,
+        40
+    ),
+
+    pygame.Rect(
+        820,
+        310,
+        125,
+        40
+    )
 ]
 
 
@@ -1352,22 +2065,139 @@ level2_moving_platforms = [
 
 level2_enemies = [
 
-    Enemy(300, 480, 150, 700),
-    Enemy(540, 383, 510, 620),
-    Enemy(820, 313, 790, 920),
-    Enemy(1090, 480, 1050, 1450),
-    Enemy(1170, 353, 1150, 1280),
-    Enemy(1430, 263, 1410, 1530),
-    Enemy(1700, 480, 1650, 1950),
-    Enemy(1880, 293, 1860, 1980),
-    Enemy(2080, 203, 2050, 2180),
-    Enemy(2380, 353, 2360, 2480),
-    Enemy(2610, 263, 2590, 2720),
-    Enemy(2830, 183, 2810, 2930),
-    Enemy(3100, 480, 3050, 3400),
-    Enemy(3180, 343, 3160, 3300),
-    Enemy(3430, 253, 3410, 3530),
-    Enemy(4600, 353, 4570, 4720)
+    Enemy(
+        300,
+        480,
+        150,
+        700
+    ),
+
+    Enemy(
+        540,
+        383,
+        510,
+        620
+    ),
+
+    Enemy(
+        820,
+        313,
+        790,
+        920
+    ),
+
+    Enemy(
+        1090,
+        480,
+        1050,
+        1450
+    ),
+
+    Enemy(
+        1170,
+        353,
+        1150,
+        1280
+    ),
+
+    Enemy(
+        1430,
+        263,
+        1410,
+        1530
+    ),
+
+    Enemy(
+        1700,
+        480,
+        1650,
+        1950
+    ),
+
+    Enemy(
+        1880,
+        293,
+        1860,
+        1980
+    ),
+
+    Enemy(
+        2080,
+        203,
+        2050,
+        2180
+    ),
+
+    Enemy(
+        2380,
+        353,
+        2360,
+        2480
+    ),
+
+    Enemy(
+        2610,
+        263,
+        2590,
+        2720
+    ),
+
+    Enemy(
+        2830,
+        183,
+        2810,
+        2930
+    ),
+
+    Enemy(
+        3100,
+        480,
+        3050,
+        3400
+    ),
+
+    Enemy(
+        3180,
+        343,
+        3160,
+        3300
+    ),
+
+    Enemy(
+        3430,
+        253,
+        3410,
+        3530
+    ),
+
+    Enemy(
+        4600,
+        353,
+        4570,
+        4720
+    )
+]
+
+
+# ============================================================
+# LEVEL 2 SLOW ENEMIES
+# ============================================================
+
+level2_slow_enemies = [
+
+    SlowEnemy(
+        650,
+        450,
+        400,
+        760
+    ),
+
+    SlowEnemy(
+        820,
+        310,
+        3800,
+        4500
+    )
 ]
 
 
@@ -1376,17 +2206,50 @@ level2_enemies = [
 # ============================================================
 
 level1_spikes = [
-    Spike(1020, 472),
-    Spike(2050, 472)
+
+    Spike(
+        1020,
+        472
+    ),
+
+    Spike(
+        2050,
+        472
+    )
 ]
 
+
 level2_spikes = [
-    Spike(600, 472),
-    Spike(1400, 472),
-    Spike(1850, 472),
-    Spike(2610, 472),
-    Spike(3400, 472),
-    Spike(4380, 472)
+
+    Spike(
+        600,
+        472
+    ),
+
+    Spike(
+        1400,
+        472
+    ),
+
+    Spike(
+        1850,
+        472
+    ),
+
+    Spike(
+        2610,
+        472
+    ),
+
+    Spike(
+        3400,
+        472
+    ),
+
+    Spike(
+        4380,
+        472
+    )
 ]
 
 
@@ -1401,6 +2264,7 @@ collision_platforms = level1_collision_platforms
 jump_pads = level1_jump_pads
 moving_platforms = level1_moving_platforms
 enemies = level1_enemies
+slow_enemies = level1_slow_enemies
 spikes = level1_spikes
 
 
@@ -1464,10 +2328,8 @@ best_score = 0
 # TIMER
 # ============================================================
 
-# Time when the current run started
 game_start_time = time.time()
 
-# Stores the final time when the player dies or wins
 final_time = 0
 
 
@@ -1513,6 +2375,7 @@ def load_level(level):
     global jump_pads
     global moving_platforms
     global enemies
+    global slow_enemies
     global spikes
     global camera_x
 
@@ -1521,10 +2384,23 @@ def load_level(level):
     if level == 1:
 
         level_platforms = level1_platforms
-        collision_platforms = level1_collision_platforms
+
+        collision_platforms = (
+            level1_collision_platforms
+        )
+
         jump_pads = level1_jump_pads
-        moving_platforms = level1_moving_platforms
+
+        moving_platforms = (
+            level1_moving_platforms
+        )
+
         enemies = level1_enemies
+
+        slow_enemies = (
+            level1_slow_enemies
+        )
+
         spikes = level1_spikes
 
         player.spawn_x = 130
@@ -1533,10 +2409,23 @@ def load_level(level):
     else:
 
         level_platforms = level2_platforms
-        collision_platforms = level2_collision_platforms
+
+        collision_platforms = (
+            level2_collision_platforms
+        )
+
         jump_pads = level2_jump_pads
-        moving_platforms = level2_moving_platforms
+
+        moving_platforms = (
+            level2_moving_platforms
+        )
+
         enemies = level2_enemies
+
+        slow_enemies = (
+            level2_slow_enemies
+        )
+
         spikes = level2_spikes
 
         player.spawn_x = 130
@@ -1552,6 +2441,24 @@ def load_level(level):
 
         enemy.alive = True
         enemy.squash_timer = 0
+
+        enemy.x = enemy.start_x
+        enemy.y = enemy.start_y
+
+        enemy.direction = 1
+        enemy.rotation = 0
+        enemy.walk_timer = 0
+
+    # RESET BIG SLOW ENEMIES
+    for enemy in slow_enemies:
+
+        enemy.alive = True
+
+        enemy.squash_timer = 0
+
+        enemy.hits_remaining = 3
+
+        enemy.hit_cooldown = 0
 
         enemy.x = enemy.start_x
         enemy.y = enemy.start_y
@@ -1760,10 +2667,6 @@ def draw_ui(surface):
         best_text,
         (20, 86)
     )
-
-    # ========================================================
-    # TIMER DISPLAY
-    # ========================================================
 
     timer_text = font.render(
         f"Time: {format_time(get_game_time())}",
@@ -2018,7 +2921,6 @@ load_level(1)
 
 level_message_timer = 0
 
-# Start timer AFTER the game is loaded
 game_start_time = time.time()
 final_time = 0
 
@@ -2029,8 +2931,7 @@ final_time = 0
 
 while running:
 
-    CLOCK.tick(FPS)
-
+    CLOCK.tick(60)
 
     # ========================================================
     # EVENTS
@@ -2068,7 +2969,6 @@ while running:
                     dead = False
                     won = False
 
-                    # RESET TIMER
                     game_start_time = time.time()
                     final_time = 0
 
@@ -2093,11 +2993,9 @@ while running:
 
             level_message_timer -= 1
 
-
         previous_bottom = (
             player.rect.bottom
         )
-
 
         # ====================================================
         # MOVING PLATFORMS
@@ -2108,7 +3006,6 @@ while running:
         ):
 
             moving_platform.update()
-
 
         # ====================================================
         # CARRY PLAYER
@@ -2160,7 +3057,6 @@ while running:
                     moving_platform.dy
                 )
 
-
         # ====================================================
         # COLLISION PLATFORMS
         # ====================================================
@@ -2174,7 +3070,6 @@ while running:
             ]
         )
 
-
         # ====================================================
         # PLAYER
         # ====================================================
@@ -2183,13 +3078,11 @@ while running:
             all_collision_platforms
         )
 
-
         # ====================================================
         # JUMP PADS
         # ====================================================
 
         check_jump_pads()
-
 
         # ====================================================
         # SPIKES
@@ -2229,20 +3122,25 @@ while running:
 
                 break
 
-
         if dead:
 
             continue
 
-
         # ====================================================
-        # ENEMIES
+        # NORMAL ENEMIES
         # ====================================================
 
         for enemy in enemies:
 
             enemy.update()
 
+        # ====================================================
+        # BIG SLOW ENEMIES
+        # ====================================================
+
+        for enemy in slow_enemies:
+
+            enemy.update()
 
         # ====================================================
         # EFFECTS
@@ -2261,9 +3159,8 @@ while running:
                     effect
                 )
 
-
         # ====================================================
-        # ENEMY COLLISIONS
+        # NORMAL ENEMY COLLISIONS
         # ====================================================
 
         for enemy in enemies:
@@ -2322,6 +3219,86 @@ while running:
 
                 break
 
+        if dead:
+
+            continue
+
+        # ====================================================
+        # BIG SLOW ENEMY COLLISIONS
+        # ====================================================
+
+        for enemy in slow_enemies:
+
+            if not enemy.alive:
+                continue
+
+            player_rect = player.rect
+            enemy_rect = enemy.rect
+
+            # STOMP
+            if is_stomping(
+                player_rect,
+                enemy_rect,
+                previous_bottom,
+                player.vy
+            ):
+
+                defeated = enemy.stomp()
+
+                if defeated:
+
+                    # Big enemy gives more points
+                    score += 300
+
+                else:
+
+                    # Still give points for each hit
+                    score += 100
+
+                player.y = (
+                    enemy_rect.top -
+                    player.h
+                )
+
+                player.vy = -11
+
+                player.on_ground = False
+
+                effects.append(
+                    PopEffect(
+                        enemy_rect.centerx,
+                        enemy_rect.top
+                    )
+                )
+
+                continue
+
+            # PLAYER GETS HIT
+            if player_hits_enemy(
+                player_rect,
+                enemy_rect
+            ):
+
+                dead = True
+
+                final_time = (
+                    time.time() -
+                    game_start_time
+                )
+
+                best_score = max(
+                    best_score,
+                    score
+                )
+
+                effects.append(
+                    ExplosionEffect(
+                        player.rect.centerx,
+                        player.rect.centery
+                    )
+                )
+
+                break
 
         # ====================================================
         # FALLING
@@ -2343,7 +3320,6 @@ while running:
                 best_score,
                 score
             )
-
 
         # ====================================================
         # LEVEL END
@@ -2376,7 +3352,6 @@ while running:
                     score
                 )
 
-
         # ====================================================
         # CAMERA
         # ====================================================
@@ -2399,7 +3374,6 @@ while running:
     draw_background(
         SCREEN
     )
-
 
     for index, platform in enumerate(
         level_platforms
@@ -2438,6 +3412,9 @@ while running:
                 visible_platform
             )
 
+    # ========================================================
+    # MOVING PLATFORMS
+    # ========================================================
 
     for moving_platform in (
         moving_platforms
@@ -2448,18 +3425,27 @@ while running:
             camera_x
         )
 
+    # ========================================================
+    # JUMP PADS
+    # ========================================================
 
     draw_jump_pads(
         SCREEN,
         camera_x
     )
 
+    # ========================================================
+    # FLAGS
+    # ========================================================
 
     draw_flags(
         SCREEN,
         camera_x
     )
 
+    # ========================================================
+    # SPIKES
+    # ========================================================
 
     for spike in spikes:
 
@@ -2468,6 +3454,9 @@ while running:
             camera_x
         )
 
+    # ========================================================
+    # NORMAL ENEMIES
+    # ========================================================
 
     for enemy in enemies:
 
@@ -2476,12 +3465,29 @@ while running:
             camera_x
         )
 
+    # ========================================================
+    # BIG SLOW ENEMIES
+    # ========================================================
+
+    for enemy in slow_enemies:
+
+        enemy.draw(
+            SCREEN,
+            camera_x
+        )
+
+    # ========================================================
+    # PLAYER
+    # ========================================================
 
     player.draw(
         SCREEN,
         camera_x
     )
 
+    # ========================================================
+    # EFFECTS
+    # ========================================================
 
     for effect in effects:
 
@@ -2490,11 +3496,13 @@ while running:
             camera_x
         )
 
+    # ========================================================
+    # UI
+    # ========================================================
 
     draw_ui(
         SCREEN
     )
-
 
     if level_message_timer > 0:
 
@@ -2502,13 +3510,11 @@ while running:
             SCREEN
         )
 
-
     if dead or won:
 
         draw_game_over(
             SCREEN
         )
-
 
     pygame.display.flip()
 
@@ -2516,6 +3522,11 @@ while running:
 # ============================================================
 # EXIT
 # ============================================================
+
+try:
+    pygame.mixer.music.stop()
+except pygame.error:
+    pass
 
 pygame.quit()
 sys.exit()
