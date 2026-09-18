@@ -3715,9 +3715,7 @@ def draw_level_message(surface):
 
 # ============================================================
 # MENU SYSTEM
-# ============================================================
 
-# Your hand-drawn menu images
 menu_play_image = load_image("play_button.png")
 menu_level_selection_image = load_image("level_selection.png")
 menu_settings_image = load_image("settings.png")
@@ -3732,7 +3730,6 @@ menu_small_font = pygame.font.Font(None, 28)
 
 
 class MenuImageButton:
-
     def __init__(self, image, center, max_size):
         self.image = image
         self.center = pygame.Vector2(center)
@@ -3743,7 +3740,13 @@ class MenuImageButton:
 
     def get_draw_size(self):
         max_w, max_h = self.max_size
-        ratio = self.image.get_width() / self.image.get_height()
+        image_w = self.image.get_width()
+        image_h = self.image.get_height()
+
+        if image_h <= 0:
+            return max_w, max_h
+
+        ratio = image_w / image_h
 
         if max_w / max_h > ratio:
             h = max_h
@@ -3752,21 +3755,16 @@ class MenuImageButton:
             w = max_w
             h = int(w / ratio)
 
-        return (
-            max(1, int(w * self.scale)),
-            max(1, int(h * self.scale))
-        )
+        return max(1, int(w * self.scale)), max(1, int(h * self.scale))
 
-    def rect(self):
-        return self.image.get_rect(
-            center=(int(self.center.x), int(self.center.y))
-        ).inflate(0, 0)
-
-    def hit(self, pos):
+    def get_rect(self):
         w, h = self.get_draw_size()
         rect = pygame.Rect(0, 0, w, h)
         rect.center = (int(self.center.x), int(self.center.y))
-        return rect.collidepoint(pos)
+        return rect
+
+    def hit(self, pos):
+        return self.get_rect().collidepoint(pos)
 
     def update(self, mouse_pos):
         if self.pressed:
@@ -3779,36 +3777,24 @@ class MenuImageButton:
         self.scale += (self.target_scale - self.scale) * 0.22
 
     def draw(self, surface):
-        size = self.get_draw_size()
         image = pygame.transform.smoothscale(
             self.image,
-            size
+            self.get_draw_size()
         )
-        rect = image.get_rect(
-            center=(int(self.center.x), int(self.center.y))
+        surface.blit(
+            image,
+            image.get_rect(center=(int(self.center.x), int(self.center.y)))
         )
-        surface.blit(image, rect)
 
 
 def draw_menu_background():
+    SCREEN.blit(background, (0, 0))
 
-    bg = pygame.transform.smoothscale(
-        background,
-        (WIDTH, HEIGHT)
-    )
-    SCREEN.blit(bg, (0, 0))
-
-    overlay = pygame.Surface(
-        (WIDTH, HEIGHT),
-        pygame.SRCALPHA
-    )
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 125))
     SCREEN.blit(overlay, (0, 0))
 
-    panel = pygame.Surface(
-        (900, 550),
-        pygame.SRCALPHA
-    )
+    panel = pygame.Surface((900, 550), pygame.SRCALPHA)
     panel.fill((10, 15, 18, 80))
     SCREEN.blit(
         panel,
@@ -3817,16 +3803,10 @@ def draw_menu_background():
 
 
 def draw_menu_title(text):
-    title = menu_title_font.render(
-        text,
-        True,
-        WHITE
-    )
+    title = menu_title_font.render(text, True, WHITE)
     SCREEN.blit(
         title,
-        title.get_rect(
-            center=(WIDTH // 2, 52)
-        )
+        title.get_rect(center=(WIDTH // 2, 55))
     )
 
 
@@ -3835,7 +3815,7 @@ def draw_back_button(rect, mouse_pos):
 
     pygame.draw.rect(
         SCREEN,
-        (35, 40, 45) if not hovered else (60, 70, 75),
+        (60, 70, 75) if hovered else (35, 40, 45),
         rect,
         border_radius=12
     )
@@ -3848,90 +3828,49 @@ def draw_back_button(rect, mouse_pos):
         border_radius=12
     )
 
-    text = menu_text_font.render(
-        "BACK",
-        True,
-        WHITE
-    )
-    SCREEN.blit(
-        text,
-        text.get_rect(center=rect.center)
-    )
+    text = menu_text_font.render("BACK", True, WHITE)
+    SCREEN.blit(text, text.get_rect(center=rect.center))
 
 
 def level_selection_menu():
-
-    # IMPORTANT:
-    # The LEVEL SELECTION image is NOT drawn again here.
-    # It is only used as the main-menu button.
-    # This prevents the same button appearing twice.
-
-    level1 = MenuImageButton(
-        menu_lvl1_image,
-        (180, 275),
-        (270, 185)
-    )
-
-    level2 = MenuImageButton(
-        menu_lvl2_image,
-        (500, 275),
-        (270, 185)
-    )
-
-    level3 = MenuImageButton(
-        menu_lvl3_image,
-        (820, 275),
-        (270, 185)
-    )
-
+    level1 = MenuImageButton(menu_lvl1_image, (180, 270), (270, 180))
+    level2 = MenuImageButton(menu_lvl2_image, (500, 270), (270, 180))
+    level3 = MenuImageButton(menu_lvl3_image, (820, 270), (270, 180))
     buttons = [level1, level2, level3]
 
-    back_rect = pygame.Rect(
-        30,
-        520,
-        140,
-        50
-    )
+    back_rect = pygame.Rect(30, 520, 140, 50)
 
     while True:
-
         mouse_pos = pygame.mouse.get_pos()
 
         for event in pygame.event.get():
-
             if event.type == pygame.QUIT:
                 return None
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return -1
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if back_rect.collidepoint(event.pos):
                     return -1
+                for button in buttons:
+                    button.pressed = button.hit(event.pos)
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                selected = None
 
-                if event.button == 1:
+                if level1.pressed and level1.hit(event.pos):
+                    selected = 1
+                elif level2.pressed and level2.hit(event.pos):
+                    selected = 2
+                elif level3.pressed and level3.hit(event.pos):
+                    selected = 3
 
-                    for button in buttons:
-                        if button.hit(event.pos):
-                            button.pressed = True
+                for button in buttons:
+                    button.pressed = False
 
-                    if back_rect.collidepoint(event.pos):
-                        return -1
-
-            if event.type == pygame.MOUSEBUTTONUP:
-
-                if event.button == 1:
-
-                    if level1.pressed and level1.hit(event.pos):
-                        return 1
-
-                    if level2.pressed and level2.hit(event.pos):
-                        return 2
-
-                    if level3.pressed and level3.hit(event.pos):
-                        return 3
-
-                    for button in buttons:
-                        button.pressed = False
+                if selected is not None:
+                    return selected
 
         for button in buttons:
             button.update(mouse_pos)
@@ -3942,84 +3881,54 @@ def level_selection_menu():
         for button in buttons:
             button.draw(SCREEN)
 
-        # Small labels are outside the images, so the images stay untouched.
         for number, x in enumerate((180, 500, 820), 1):
-            label = menu_small_font.render(
-                f"LEVEL {number}",
-                True,
-                WHITE
-            )
-            SCREEN.blit(
-                label,
-                label.get_rect(
-                    center=(x, 405)
-                )
-            )
+            label = menu_small_font.render(f"LEVEL {number}", True, WHITE)
+            SCREEN.blit(label, label.get_rect(center=(x, 400)))
 
-        draw_back_button(
-            back_rect,
-            mouse_pos
-        )
-
+        draw_back_button(back_rect, mouse_pos)
         pygame.display.flip()
         CLOCK.tick(FPS)
 
 
 def settings_menu():
-
-    # IMPORTANT:
-    # The SETTINGS image is NOT drawn again here.
-    # It is only used as the main-menu button.
-
-    back_rect = pygame.Rect(
-        30,
-        520,
-        140,
-        50
-    )
+    back_rect = pygame.Rect(30, 520, 140, 50)
+    slider = pygame.Rect(300, 270, 400, 20)
+    dragging_slider = False
 
     while True:
-
         mouse_pos = pygame.mouse.get_pos()
 
         for event in pygame.event.get():
-
             if event.type == pygame.QUIT:
                 return None
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return -1
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if back_rect.collidepoint(event.pos):
                     return -1
+                if slider.inflate(25, 35).collidepoint(event.pos):
+                    dragging_slider = True
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                dragging_slider = False
 
-                if event.button == 1:
+            if event.type == pygame.MOUSEMOTION and dragging_slider:
+                volume = (event.pos[0] - slider.x) / slider.width
+                volume = max(0.0, min(1.0, volume))
+                try:
+                    pygame.mixer.music.set_volume(volume)
+                except pygame.error:
+                    pass
 
-                    if back_rect.collidepoint(event.pos):
-                        return -1
-
-                    # Volume slider
-                    slider = pygame.Rect(
-                        300,
-                        270,
-                        400,
-                        20
-                    )
-
-                    if slider.inflate(20, 30).collidepoint(event.pos):
-                        volume = max(
-                            0.0,
-                            min(
-                                1.0,
-                                (event.pos[0] - slider.x) / slider.width
-                            )
-                        )
-                        pygame.mixer.music.set_volume(volume)
+        try:
+            volume = pygame.mixer.music.get_volume()
+        except pygame.error:
+            volume = 0.0
 
         draw_menu_background()
         draw_menu_title("SETTINGS")
-
-        volume = pygame.mixer.music.get_volume()
 
         volume_text = menu_text_font.render(
             f"Music volume: {int(volume * 100)}%",
@@ -4028,16 +3937,7 @@ def settings_menu():
         )
         SCREEN.blit(
             volume_text,
-            volume_text.get_rect(
-                center=(WIDTH // 2, 210)
-            )
-        )
-
-        slider = pygame.Rect(
-            300,
-            270,
-            400,
-            20
+            volume_text.get_rect(center=(WIDTH // 2, 210))
         )
 
         pygame.draw.rect(
@@ -4047,19 +3947,20 @@ def settings_menu():
             border_radius=10
         )
 
-        fill = pygame.Rect(
-            slider.x,
-            slider.y,
-            int(slider.width * volume),
-            slider.height
-        )
-
-        pygame.draw.rect(
-            SCREEN,
-            (90, 210, 110),
-            fill,
-            border_radius=10
-        )
+        fill_width = int(slider.width * volume)
+        if fill_width > 0:
+            fill = pygame.Rect(
+                slider.x,
+                slider.y,
+                fill_width,
+                slider.height
+            )
+            pygame.draw.rect(
+                SCREEN,
+                (90, 210, 110),
+                fill,
+                border_radius=10
+            )
 
         pygame.draw.rect(
             SCREEN,
@@ -4069,102 +3970,75 @@ def settings_menu():
             border_radius=10
         )
 
-        draw_back_button(
-            back_rect,
-            mouse_pos
+        pygame.draw.circle(
+            SCREEN,
+            WHITE,
+            (slider.x + int(slider.width * volume), slider.centery),
+            10
         )
 
+        draw_back_button(back_rect, mouse_pos)
         pygame.display.flip()
         CLOCK.tick(FPS)
 
 
 def main_menu():
-
-    # Your exact hand-drawn images are used as the buttons.
-    play = MenuImageButton(
-        menu_play_image,
-        (300, 205),
-        (320, 190)
-    )
-
-    level_selection = MenuImageButton(
-        menu_level_selection_image,
-        (700, 205),
-        (320, 190)
-    )
-
-    settings = MenuImageButton(
-        menu_settings_image,
-        (300, 425),
-        (320, 190)
-    )
-
-    quit_button = MenuImageButton(
-        menu_quit_image,
-        (700, 425),
-        (320, 190)
-    )
-
-    buttons = [
-        play,
-        level_selection,
-        settings,
-        quit_button
-    ]
+    play = MenuImageButton(menu_play_image, (300, 205), (320, 175))
+    level_selection = MenuImageButton(menu_level_selection_image, (700, 205), (320, 175))
+    settings = MenuImageButton(menu_settings_image, (300, 425), (320, 175))
+    quit_button = MenuImageButton(menu_quit_image, (700, 425), (320, 175))
+    buttons = [play, level_selection, settings, quit_button]
 
     while True:
-
         mouse_pos = pygame.mouse.get_pos()
 
         for event in pygame.event.get():
-
             if event.type == pygame.QUIT:
                 return None
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return None
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for button in buttons:
+                    button.pressed = button.hit(event.pos)
+
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                action = None
+
+                if play.pressed and play.hit(event.pos):
+                    action = "play"
+                elif level_selection.pressed and level_selection.hit(event.pos):
+                    action = "levels"
+                elif settings.pressed and settings.hit(event.pos):
+                    action = "settings"
+                elif quit_button.pressed and quit_button.hit(event.pos):
+                    action = "quit"
+
+                for button in buttons:
+                    button.pressed = False
+
+                if action == "play":
+                    result = level_selection_menu()
+                    if result is None:
+                        return None
+                    if result != -1:
+                        return result
+
+                elif action == "levels":
+                    result = level_selection_menu()
+                    if result is None:
+                        return None
+                    if result != -1:
+                        return result
+
+                elif action == "settings":
+                    result = settings_menu()
+                    if result is None:
+                        return None
+
+                elif action == "quit":
                     return None
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-
-                if event.button == 1:
-
-                    for button in buttons:
-                        if button.hit(event.pos):
-                            button.pressed = True
-
-            if event.type == pygame.MOUSEBUTTONUP:
-
-                if event.button == 1:
-
-                    if play.pressed and play.hit(event.pos):
-                        play.pressed = False
-                        result = level_selection_menu()
-                        if result is None:
-                            return None
-                        if result != -1:
-                            return result
-
-                    if level_selection.pressed and level_selection.hit(event.pos):
-                        level_selection.pressed = False
-                        result = level_selection_menu()
-                        if result is None:
-                            return None
-                        if result != -1:
-                            return result
-
-                    if settings.pressed and settings.hit(event.pos):
-                        settings.pressed = False
-                        result = settings_menu()
-                        if result is None:
-                            return None
-
-                    if quit_button.pressed and quit_button.hit(event.pos):
-                        pygame.quit()
-                        sys.exit()
-
-                    for button in buttons:
-                        button.pressed = False
 
         for button in buttons:
             button.update(mouse_pos)
@@ -4179,7 +4053,6 @@ def main_menu():
         CLOCK.tick(FPS)
 
 
-# ============================================================
 # START
 # ============================================================
 
@@ -4217,6 +4090,24 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN:
+
+            if event.key == pygame.K_ESCAPE:
+                selected_level = main_menu()
+
+                if selected_level is None:
+                    running = False
+                    continue
+
+                load_level(selected_level)
+                current_level = selected_level
+                dead = False
+                won = False
+                score = 0
+                level_message_timer = 0
+                game_start_time = time.time()
+                final_time = 0
+                effects.clear()
+                continue
 
             if (
                 event.key in (
